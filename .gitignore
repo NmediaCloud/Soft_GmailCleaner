@@ -1,0 +1,7 @@
+.clasp.json
+node_modules/
+.claude/
+*.url
+.DS_Store
+Thumbs.db
+*.local.md

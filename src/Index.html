@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<title>Gmail Cleaner</title>
+<style>
+  :root {
+    --bg: #f5f3f0; --card: #ffffff; --ink: #1f1a17; --muted: #6f6660; --line: #e4ddd6;
+    --accent: #f26b1d; --accent-strong: #c9530f; --accent-soft: #fde8da; --on-accent: #fff;
+    --ok: #1f8a4c; --ok-soft: #dcf3e5; --warn: #a86b00; --warn-soft: #fdf0d2; --err: #b3261e; --err-soft: #fbe0de;
+    --track: #eee8e2; --shadow: 0 10px 30px rgba(31, 26, 23, .08);
+  }
+  /* Dark: forced with the Dark button, or automatic when the system is dark and Light isn't forced */
+  :root[data-theme="dark"] {
+    --bg: #151210; --card: #1f1a17; --ink: #f2ece7; --muted: #a89e97; --line: #342c27;
+    --accent: #ff7a2e; --accent-strong: #ffa062; --accent-soft: #3a2415; --on-accent: #1a0d05;
+    --ok: #5fd08f; --ok-soft: #173424; --warn: #f2c14e; --warn-soft: #3a2f12; --err: #ff8a80; --err-soft: #3d1c1a;
+    --track: #2c2521; --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151210; --card: #1f1a17; --ink: #f2ece7; --muted: #a89e97; --line: #342c27;
+      --accent: #ff7a2e; --accent-strong: #ffa062; --accent-soft: #3a2415; --on-accent: #1a0d05;
+      --ok: #5fd08f; --ok-soft: #173424; --warn: #f2c14e; --warn-soft: #3a2f12; --err: #ff8a80; --err-soft: #3d1c1a;
+      --track: #2c2521; --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+      color-scheme: dark;
+    }
+  }
+  .theme-switch { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--card); flex: none; }
+  .theme-switch button { border: 0; background: transparent; color: var(--muted); padding: 4px 11px; border-radius: 999px; font-size: .8rem; }
+  .theme-switch button.active { background: var(--accent); color: var(--on-accent); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .logo { width: 40px; height: 40px; border-radius: 10px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; flex: none; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0; }
+  .sub { margin: 0; color: var(--muted); font-size: .85rem; }
+  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .acct { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .acct b { font-size: 1rem; overflow-wrap: anywhere; }
+  .switch { font-size: .82rem; color: var(--muted); }
+  .switch a { color: var(--accent-strong); margin-left: 6px; }
+  label.h { display: block; font-weight: 600; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: .82rem; margin: 4px 0 0; }
+  textarea, input[type=number] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px;
+    background: var(--bg); color: var(--ink); font: inherit;
+  }
+  textarea { min-height: 110px; resize: vertical; font-family: Consolas, "Cascadia Mono", monospace; font-size: .9rem; }
+  select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); font: inherit; font-size: .85rem; }
+  textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  .opts label { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: .92rem; }
+  input[type=number] { width: 110px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button { font: inherit; font-weight: 600; border-radius: 9px; padding: 9px 15px; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.danger { background: var(--err); border-color: var(--err); color: #fff; }
+  button.small { padding: 4px 10px; font-size: .8rem; border-radius: 7px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { font-family: Consolas, monospace; font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+  .bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: 6px; }
+  .bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+  .bar span.done { background: var(--ok); }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--track); color: var(--muted); }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.err { background: var(--err-soft); color: var(--err); }
+  .pill.run { background: var(--accent-soft); color: var(--accent-strong); }
+  .status { margin-top: 12px; font-size: .9rem; min-height: 1.3em; }
+  .total { font-weight: 700; margin-top: 10px; }
+  .task { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .task.running { border-color: var(--accent); }
+  .task-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .task-title { font-weight: 600; overflow-wrap: anywhere; }
+  .task-meta { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+  .empty { color: var(--muted); font-size: .88rem; text-align: center; padding: 10px; }
+  details.hist { border-top: 1px solid var(--line); padding: 7px 0; }
+  details.hist summary { cursor: pointer; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .9rem; }
+  details.hist ul { margin: 6px 0 0 18px; padding: 0; font-size: .85rem; color: var(--muted); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">GC</div>
+    <div>
+      <h1>Gmail Cleaner</h1>
+      <p class="sub">Bulk clean-up that runs on Google's servers · moves to Trash only (recoverable for 30 days)</p>
+    </div>
+    <div class="theme-switch" role="group" aria-label="Color theme">
+      <button type="button" data-theme-choice="auto" title="Follow Windows / Chrome setting">Auto</button>
+      <button type="button" data-theme-choice="light">Light</button>
+      <button type="button" data-theme-choice="dark">Dark</button>
+    </div>
+  </header>
+
+  <section class="card acct">
+    <div>
+      <div class="hint" style="margin:0">Cleaning this Gmail account</div>
+      <b id="email">Loading…</b>
+    </div>
+    <div class="switch" id="switch">Use another account:</div>
+  </section>
+
+  <!-- ============ ANALYSE ============ -->
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Analyse my inbox</h2>
+        <p class="hint">Finds the senders filling your inbox and suggests what's safe to clear. Nothing changes until you run it.</p>
+      </div>
+      <button id="analyseBtn" class="primary" type="button">Analyse</button>
+    </div>
+    <div class="status" id="analyseStatus"></div>
+    <div id="analyseBox" class="hidden">
+      <table>
+        <thead><tr><th></th><th>Sender</th><th class="num">Emails</th><th class="num">Unread</th><th>Suggested action</th></tr></thead>
+        <tbody id="analyseRows"></tbody>
+      </table>
+      <div class="row">
+        <button id="runSelectedBtn" class="danger" type="button">Preview &amp; run selected</button>
+        <button id="nightlySelectedBtn" type="button">+ Add selected to nightly</button>
+        <button id="selectSuggestedBtn" class="small" type="button">Select suggested</button>
+        <button id="selectNoneBtn" class="small" type="button">Select none</button>
+      </div>
+      <p class="hint">⚠️ marks banks, security, government and school senders. They're never pre-selected; pick an action yourself if you want. People (Gmail, Outlook, etc. addresses) are always suggested "Keep". Suggestions are a guide, so check before running.</p>
+    </div>
+  </section>
+
+  <!-- ============ NEW TASK ============ -->
+  <section class="card">
+    <label class="h" for="lines">What should go to Trash?</label>
+    <textarea id="lines" placeholder="One per line, e.g.&#10;temu&#10;etsy&#10;indeed&#10;newsletter@shop.com"></textarea>
+    <p class="hint">One keyword or sender per line. Advanced: any full Gmail search works too, e.g. <code>subject:(sale) older_than:1y</code>.</p>
+
+    <div class="grid">
+      <div class="opts">
+        <label class="h">Match keywords in</label>
+        <label><input type="radio" name="mode" value="from" checked> Sender name or address <span class="hint">(safest)</span></label>
+        <label><input type="radio" name="mode" value="anywhere"> Anywhere in the email</label>
+        <label class="h" style="margin-top:12px" for="age">Only emails older than</label>
+        <label><input id="age" type="number" min="0" step="1" value="0"> days <span class="hint">(0 = any age)</span></label>
+        <label style="margin-top:8px"><input id="unreadOnly" type="checkbox"> Only <b>unread</b> emails</label>
+      </div>
+      <div class="opts">
+        <label class="h">Also clear whole Gmail tabs</label>
+        <label><input type="checkbox" name="preset" value="promotions"> Promotions</label>
+        <label><input type="checkbox" name="preset" value="social"> Social</label>
+        <label><input type="checkbox" name="preset" value="updates"> Updates</label>
+        <label><input type="checkbox" name="preset" value="forums"> Forums</label>
+        <label><input type="checkbox" name="preset" value="allunread"> <b>All unread mail</b> (any sender)</label>
+        <p class="hint">Tip: combine with "older than" days, e.g. All unread mail + 90 days = everything you never opened in 3 months.</p>
+        <label class="h" style="margin-top:12px">Protection</label>
+        <label><input type="checkbox" checked disabled> Never touch ⭐ starred mail</label>
+        <label><input id="important" type="checkbox"> Skip mail Gmail marked Important</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="previewBtn" class="primary" type="button">1 · Preview counts</button>
+      <button id="trashBtn" class="danger" type="button" disabled>2 · Move to Trash</button>
+      <button id="saveNightlyBtn" type="button">+ Add to nightly</button>
+    </div>
+    <div class="status" id="status"></div>
+
+    <div id="previewBox" class="hidden" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Rule</th><th class="num">Found</th></tr></thead>
+        <tbody id="previewRows"></tbody>
+      </table>
+      <div class="total" id="previewTotal"></div>
+    </div>
+  </section>
+
+  <!-- ============ QUEUE ============ -->
+  <section class="card">
+    <div class="card-head">
+      <h2>Queue</h2>
+      <div class="row" style="margin:0">
+        <button id="stopBtn" class="small" type="button" disabled>Stop current</button>
+        <button id="clearDoneBtn" class="small" type="button">Clear finished</button>
+      </div>
+    </div>
+    <div id="queue"><div class="empty">No tasks yet. Preview something above, then "Move to Trash".</div></div>
+  </section>
+
+  <!-- ============ NIGHTLY ============ -->
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Nightly clean-up</h2>
+        <p class="hint" id="nightlyWhen">…</p>
+      </div>
+      <div class="row" style="margin:0">
+        <span id="nightlyPill" class="pill">…</span>
+        <button id="nightlyBtn" class="small" type="button">…</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Nightly rule</th><th>Gmail search it runs</th><th></th></tr></thead>
+      <tbody id="nightlyRows"></tbody>
+    </table>
+    <p class="hint">Add rules with <b>+ Add to nightly</b> (form above) or the <b>+ Nightly</b> button on any queue task.</p>
+    <div class="row">
+      <button id="runNightlyBtn" class="small" type="button">Run these now</button>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="card">
+    <div class="card-head"><h2>History</h2><span class="hint">last 15 runs</span></div>
+    <div id="history"><div class="empty">No runs yet.</div></div>
+  </section>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const APP_URL = <?!= JSON.stringify(ScriptApp.getService().getUrl()) ?>; // filled in by Apps Script when the page is served
+
+  // Promise wrapper around google.script.run (with a local mock for design previews).
+  const call = (fn, ...args) => new Promise((resolve, reject) => {
+    if (typeof google === 'undefined') return resolve(window.__mock ? window.__mock(fn, ...args) : null);
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+
+  // ---------- theme (Auto / Light / Dark), remembered in this browser ----------
+  function applyTheme(choice) {
+    if (choice === 'light' || choice === 'dark') document.documentElement.dataset.theme = choice;
+    else delete document.documentElement.dataset.theme;
+    document.querySelectorAll('[data-theme-choice]').forEach(b => b.classList.toggle('active', b.dataset.themeChoice === choice));
+    try { localStorage.setItem('gc-theme', choice); } catch (e) { /* storage may be blocked */ }
+  }
+  document.querySelectorAll('[data-theme-choice]').forEach(b => b.onclick = () => applyTheme(b.dataset.themeChoice));
+  let savedTheme = 'auto';
+  try { savedTheme = localStorage.getItem('gc-theme') || 'auto'; } catch (e) { /* ignore */ }
+  applyTheme(savedTheme);
+
+  // ---------- form ----------
+  let lastPreview = null, account = null;
+
+  function settings() {
+    return {
+      lines: $('lines').value.split('\n').map(s => s.trim()).filter(Boolean),
+      mode: document.querySelector('input[name=mode]:checked').value,
+      olderThanDays: Number($('age').value) || 0,
+      presets: [...document.querySelectorAll('input[name=preset]:checked')].map(c => c.value),
+      unreadOnly: $('unreadOnly').checked,
+      protectImportant: $('important').checked
+    };
+  }
+
+  function applySettings(s) {
+    if (!s) return;
+    $('lines').value = (s.lines || []).join('\n');
+    document.querySelectorAll('input[name=mode]').forEach(r => { r.checked = r.value === (s.mode || 'from'); });
+    $('age').value = s.olderThanDays || 0;
+    document.querySelectorAll('input[name=preset]').forEach(c => { c.checked = (s.presets || []).includes(c.value); });
+    $('important').checked = !!s.protectImportant;
+    $('unreadOnly').checked = !!s.unreadOnly;
+    invalidatePreview();
+  }
+
+  function describe(s) {
+    const names = { allunread: 'All unread' };
+    const parts = [...s.lines, ...s.presets.map(p => names[p] || p[0].toUpperCase() + p.slice(1))];
+    const title = parts.slice(0, 4).join(', ') + (parts.length > 4 ? ` +${parts.length - 4} more` : '');
+    return title + (s.unreadOnly ? ' · unread only' : '') + (s.olderThanDays ? ` · older than ${s.olderThanDays}d` : '');
+  }
+
+  function setStatus(html, kind) { $('status').innerHTML = kind ? `<span class="pill ${kind}">${html}</span>` : html; }
+
+  function invalidatePreview() {
+    lastPreview = null;
+    $('trashBtn').disabled = true;
+    $('previewBox').classList.add('hidden');
+  }
+  document.querySelectorAll('textarea, input').forEach(el => el.addEventListener('input', invalidatePreview));
+
+  function updateTrashLabel() {
+    $('trashBtn').textContent = worker.busy ? '2 · Add to queue' : '2 · Move to Trash';
+  }
+
+  $('previewBtn').onclick = async () => {
+    const s = settings();
+    if (!s.lines.length && !s.presets.length) return setStatus('Type at least one keyword or pick a Gmail tab.', 'warn');
+    $('previewBtn').disabled = true; $('trashBtn').disabled = true;
+    setStatus('Counting… (large mailboxes can take a minute)');
+    try {
+      const rows = await call('preview', s);
+      lastPreview = { settings: s, rows };
+      $('previewRows').innerHTML = rows.map(r => `<tr><td>${esc(r.label)}<br><code>${esc(r.query)}</code></td><td class="num">${r.count}${r.capped ? '+' : ''}</td></tr>`).join('');
+      const total = rows.reduce((a, r) => a + r.count, 0);
+      $('previewTotal').textContent = `Found about ${total} conversations`;
+      $('previewBox').classList.remove('hidden');
+      $('trashBtn').disabled = total === 0;
+      updateTrashLabel();
+      setStatus(total ? 'Preview ready. Nothing has changed yet.' : 'Nothing matches.', total ? 'ok' : 'warn');
+    } catch (e) {
+      setStatus('Error: ' + esc(e.message || e), 'err');
+    } finally { $('previewBtn').disabled = false; }
+  };
+
+  $('trashBtn').onclick = () => {
+    if (!lastPreview) return;
+    const total = lastPreview.rows.reduce((a, r) => a + r.count, 0);
+    const when = worker.busy ? 'after the current task finishes' : 'now';
+    if (!confirm(`Move about ${total} conversations to Trash ${when}?\n\nThey stay recoverable in Trash for 30 days. Starred mail is never touched.`)) return;
+    const wasBusy = worker.busy;
+    enqueue(describe(lastPreview.settings), lastPreview.rows);
+    invalidatePreview();
+    setStatus(wasBusy ? 'Added to the queue.' : 'Started.', 'ok');
+  };
+
+  // ---------- queue ----------
+  // Each task keeps its own snapshot of the plan, so editing the form never affects it.
+  const queue = [];
+  const worker = { busy: false, stopCurrent: false };
+  let nextId = 1;
+
+  function enqueue(title, rows) {
+    const todo = rows.filter(r => r.count > 0);
+    queue.push({ id: nextId++, title, rows: todo, moved: todo.map(() => 0), status: 'waiting', error: '' });
+    renderQueue();
+    runQueue();
+  }
+
+  async function runQueue() {
+    if (worker.busy) return;
+    worker.busy = true; updateTrashLabel();
+    try {
+      let task;
+      while ((task = queue.find(t => t.status === 'waiting'))) {
+        task.status = 'running'; worker.stopCurrent = false;
+        $('stopBtn').disabled = false; renderQueue();
+        try {
+          for (let i = 0; i < task.rows.length && !worker.stopCurrent; i++) {
+            let done = false;
+            while (!done && !worker.stopCurrent) {
+              const r = await call('trashBatch', task.rows[i].query);
+              task.moved[i] += (r && r.moved) || 0;
+              done = !r || r.done;
+              renderQueue();
+            }
+          }
+          task.status = worker.stopCurrent ? 'stopped' : 'done';
+        } catch (e) {
+          task.status = 'error'; task.error = String(e.message || e);
+        }
+        const total = task.moved.reduce((a, b) => a + b, 0);
+        try {
+          const history = await call('logRun', { total, stopped: task.status !== 'done', rules: task.rows.map((r, i) => ({ label: r.label, moved: task.moved[i] })) });
+          if (history) renderHistory(history);
+        } catch (e) { /* history is best-effort */ }
+        renderQueue();
+      }
+    } finally {
+      worker.busy = false; $('stopBtn').disabled = true; updateTrashLabel();
+    }
+  }
+
+  function renderQueue() {
+    if (!queue.length) { $('queue').innerHTML = '<div class="empty">No tasks yet. Preview something above, then "Move to Trash".</div>'; return; }
+    const PILL = { waiting: ['Waiting', ''], running: ['Running', 'run'], done: ['Done', 'ok'], stopped: ['Stopped', 'warn'], error: ['Error', 'err'] };
+    $('queue').innerHTML = queue.map(t => {
+      const found = t.rows.reduce((a, r) => a + r.count, 0);
+      const moved = t.moved.reduce((a, b) => a + b, 0);
+      const pct = found ? Math.min(100, Math.round(moved / found * 100)) : 100;
+      const [label, cls] = PILL[t.status];
+      const current = t.status === 'running' ? (t.rows.find((r, i) => t.moved[i] < r.count) || {}).label : '';
+      const plan = (account && account.nightlyPlan) || [];
+      const inNightly = t.rows.length && t.rows.every(r => plan.some(p => p.query === r.query));
+      return `<div class="task ${t.status}">
+        <div class="task-top">
+          <div class="task-title">${esc(t.title)}</div>
+          <div><span class="pill ${cls}">${label}</span>
+            ${inNightly ? '<span class="pill ok">✓ Nightly</span>' : `<button class="small" data-nightly="${t.id}" type="button">+ Nightly</button>`}
+            ${t.status === 'waiting' ? `<button class="small" data-remove="${t.id}" type="button">Remove</button>` : ''}</div>
+        </div>
+        <div class="task-meta">${moved} of ~${found} moved to Trash${current ? ` · now: ${esc(current)}` : ''}${t.error ? ` · ${esc(t.error)}` : ''}</div>
+        <div class="bar"><span class="${t.status === 'done' ? 'done' : ''}" style="width:${pct}%"></span></div>
+      </div>`;
+    }).join('');
+    $('queue').querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
+      const i = queue.findIndex(t => t.id === Number(b.dataset.remove) && t.status === 'waiting');
+      if (i >= 0) queue.splice(i, 1);
+      renderQueue();
+    });
+    $('queue').querySelectorAll('[data-nightly]').forEach(b => b.onclick = async () => {
+      const t = queue.find(x => x.id === Number(b.dataset.nightly));
+      if (!t) return;
+      b.disabled = true;
+      await updateNightly(call('addNightlyRules', t.rows.map(r => ({ label: r.label, query: r.query }))));
+      setStatus(`"${esc(t.title)}" added to the nightly list.`, 'ok');
+    });
+  }
+
+  $('stopBtn').onclick = () => { worker.stopCurrent = true; setStatus('Stopping the current task after this batch…', 'warn'); };
+  $('clearDoneBtn').onclick = () => {
+    for (let i = queue.length - 1; i >= 0; i--) if (['done', 'stopped', 'error'].includes(queue[i].status)) queue.splice(i, 1);
+    renderQueue();
+  };
+
+  // ---------- nightly ----------
+  function renderNightly() {
+    const a = account || {};
+    const hour = a.nightlyHour ?? 3;
+    $('nightlyWhen').textContent = `Every day around ${hour}:00 (${a.timeZone || 'script time zone'}) · uses the saved rules below`;
+    $('nightlyPill').textContent = a.nightly ? 'ON' : 'OFF';
+    $('nightlyPill').className = 'pill ' + (a.nightly ? 'ok' : '');
+    $('nightlyBtn').textContent = a.nightly ? 'Turn off' : 'Turn on';
+    $('nightlyBtn').className = 'small ' + (a.nightly ? '' : 'primary');
+    const plan = a.nightlyPlan || [];
+    $('nightlyRows').innerHTML = plan.length
+      ? plan.map((r, i) => `<tr><td>${esc(r.label)}</td><td><code>${esc(r.query)}</code></td>
+          <td class="num"><button class="small" data-unnightly="${i}" type="button">Remove</button></td></tr>`).join('')
+      : '<tr><td colspan="3" class="empty">No nightly rules yet.</td></tr>';
+    $('nightlyRows').querySelectorAll('[data-unnightly]').forEach(b => b.onclick = async () => {
+      const r = plan[Number(b.dataset.unnightly)];
+      if (!r || !confirm(`Remove "${r.label}" from the nightly list?`)) return;
+      b.disabled = true;
+      await updateNightly(call('removeNightlyRule', r.query));
+      setStatus(`"${esc(r.label)}" removed from the nightly list.`, 'ok');
+    });
+    $('runNightlyBtn').disabled = !plan.length;
+    $('nightlyBtn').disabled = !plan.length && !a.nightly;
+  }
+
+  // Update the nightly list from a server call that returns the new list.
+  async function updateNightly(promise) {
+    try {
+      const list = await promise;
+      if (account) account.nightlyPlan = list || [];
+      renderNightly();
+      renderQueue();
+    } catch (e) {
+      setStatus('Error: ' + esc(e.message || e), 'err');
+    }
+  }
+
+  async function refreshAccount() {
+    account = await call('getAccount');
+    if (!account) return;
+    renderNightly();
+    renderHistory(account.history || []);
+  }
+
+  $('saveNightlyBtn').onclick = async () => {
+    const s = settings();
+    if (!s.lines.length && !s.presets.length) return setStatus('Nothing to add: the form is empty.', 'warn');
+    await updateNightly(call('addNightlyFromSettings', s));
+    setStatus('Added to the nightly list (duplicates are skipped). See the Nightly section below.', 'ok');
+  };
+
+  $('nightlyBtn').onclick = async () => {
+    const on = !(account && account.nightly);
+    if (on && !confirm('Turn on the nightly clean-up with the saved rules shown in the Nightly section?')) return;
+    await call('setNightly', on);
+    await refreshAccount();
+    setStatus(on ? 'Nightly clean-up is ON.' : 'Nightly clean-up is OFF.', 'ok');
+  };
+
+  $('runNightlyBtn').onclick = async () => {
+    const plan = (account && account.nightlyPlan) || [];
+    if (!plan.length) return;
+    $('runNightlyBtn').disabled = true;
+    setStatus('Counting the nightly rules…');
+    try {
+      const rows = await call('previewRules', plan);
+      const total = rows.reduce((a, r) => a + r.count, 0);
+      if (!total) return setStatus('Nightly rules match nothing right now.', 'warn');
+      if (!confirm(`Run the nightly rules now and move about ${total} conversations to Trash?`)) return setStatus('');
+      const wasBusy = worker.busy;
+      enqueue('Nightly rules (run now)', rows);
+      setStatus(wasBusy ? 'Nightly rules added to the queue.' : 'Running nightly rules.', 'ok');
+    } catch (e) {
+      setStatus('Error: ' + esc(e.message || e), 'err');
+    } finally { $('runNightlyBtn').disabled = false; }
+  };
+
+  // ---------- analyse ----------
+  let analysis = [];
+  const setAnalyseStatus = (html, kind) => { $('analyseStatus').innerHTML = kind ? '<span class="pill ' + kind + '">' + html + '</span>' : html; };
+  const ACTIONS = { all: 'Trash all', 30: 'Trash older than 30 days', 90: 'Trash older than 90 days', keep: 'Keep' };
+
+  function senderRule(s, action) {
+    const age = action === 'all' ? '' : ` older_than:${action}d`;
+    const label = `${s.name}${action === 'all' ? '' : ` (older than ${action}d)`}`;
+    return { label, query: `from:(${s.email})${age} -is:starred` };
+  }
+
+  function selectedRules() {
+    return [...document.querySelectorAll('#analyseRows tr')].map(tr => {
+      const i = Number(tr.dataset.i);
+      const on = tr.querySelector('input[type=checkbox]').checked;
+      const action = tr.querySelector('select').value;
+      return on && action !== 'keep' ? senderRule(analysis[i], action) : null;
+    }).filter(Boolean);
+  }
+
+  function renderAnalysis() {
+    $('analyseRows').innerHTML = analysis.map((s, i) => `
+      <tr data-i="${i}">
+        <td><input type="checkbox" ${s.suggestion !== 'keep' ? 'checked' : ''}></td>
+        <td><b>${esc(s.name)}</b>${s.careful ? ' ⚠️' : ''}${s.bulk ? ' <span class="pill">bulk</span>' : ''}<br><code>${esc(s.email)}</code></td>
+        <td class="num">${s.count}</td>
+        <td class="num">${Math.round(s.unread / s.count * 100)}%</td>
+        <td><select>${Object.entries(ACTIONS).map(([v, t]) => `<option value="${v}" ${v === s.suggestion ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+      </tr>`).join('');
+    // Choosing "Keep" unticks the row; choosing an action ticks it.
+    $('analyseRows').querySelectorAll('select').forEach(sel => sel.onchange = () => {
+      sel.closest('tr').querySelector('input[type=checkbox]').checked = sel.value !== 'keep';
+    });
+    $('analyseBox').classList.remove('hidden');
+  }
+
+  $('analyseBtn').onclick = async () => {
+    $('analyseBtn').disabled = true;
+    setAnalyseStatus('Analysing your inbox… (up to about 1½ minutes)');
+    try {
+      const r = await call('analyse');
+      analysis = r.senders || [];
+      renderAnalysis();
+      const suggested = analysis.filter(s => s.suggestion !== 'keep').length;
+      setAnalyseStatus(`Scanned ${r.scanned} recent inbox conversations in ${r.seconds}s. ${analysis.length} frequent senders, ${suggested} suggested for clean-up.`, 'ok');
+    } catch (e) {
+      setAnalyseStatus('Error: ' + esc(e.message || e), 'err');
+    } finally { $('analyseBtn').disabled = false; }
+  };
+
+  $('selectSuggestedBtn').onclick = () => document.querySelectorAll('#analyseRows tr').forEach(tr => {
+    tr.querySelector('input[type=checkbox]').checked = analysis[Number(tr.dataset.i)].suggestion !== 'keep';
+  });
+  $('selectNoneBtn').onclick = () => document.querySelectorAll('#analyseRows input[type=checkbox]').forEach(c => { c.checked = false; });
+
+  $('runSelectedBtn').onclick = async () => {
+    const rules = selectedRules();
+    if (!rules.length) return setAnalyseStatus('Tick at least one sender (and pick an action other than Keep).', 'warn');
+    $('runSelectedBtn').disabled = true;
+    setAnalyseStatus('Counting the selected senders…');
+    try {
+      const rows = await call('previewRules', rules);
+      const total = rows.reduce((a, r) => a + r.count, 0);
+      if (!total) return setAnalyseStatus('Nothing matches the selected actions.', 'warn');
+      const list = rows.filter(r => r.count).map(r => `• ${r.label}: ${r.count}${r.capped ? '+' : ''}`).join('\n');
+      if (!confirm(`Move about ${total} conversations to Trash?\n\n${list}\n\nRecoverable in Trash for 30 days. Starred mail is never touched.`)) return setAnalyseStatus('');
+      const wasBusy = worker.busy;
+      enqueue(`Analysis: ${rules.length} sender${rules.length > 1 ? 's' : ''}`, rows);
+      setAnalyseStatus(wasBusy ? 'Added to the queue.' : 'Started. Watch the Queue below.', 'ok');
+    } catch (e) {
+      setAnalyseStatus('Error: ' + esc(e.message || e), 'err');
+    } finally { $('runSelectedBtn').disabled = false; }
+  };
+
+  $('nightlySelectedBtn').onclick = async () => {
+    const rules = selectedRules();
+    if (!rules.length) return setAnalyseStatus('Tick at least one sender (and pick an action other than Keep).', 'warn');
+    await updateNightly(call('addNightlyRules', rules));
+    setAnalyseStatus(`${rules.length} rule(s) added to the nightly list (duplicates skipped).`, 'ok');
+  };
+
+  // ---------- history ----------
+  function renderHistory(history) {
+    if (!history.length) { $('history').innerHTML = '<div class="empty">No runs yet.</div>'; return; }
+    $('history').innerHTML = history.map(h => `
+      <details class="hist">
+        <summary>
+          <span class="pill ${h.type === 'nightly' ? 'run' : ''}">${h.type === 'nightly' ? 'Nightly' : 'Manual'}</span>
+          <span>${esc(new Date(h.at).toLocaleString())}</span>
+          <b>${h.total} moved</b>
+          ${h.stopped ? '<span class="pill warn">partial</span>' : ''}
+        </summary>
+        <ul>${(h.rules || []).map(r => `<li>${esc(r.label)}: ${r.moved}</li>`).join('')}</ul>
+      </details>`).join('');
+  }
+
+  // ---------- boot ----------
+  // If the account never loads, the browser is usually signed in to several Google
+  // accounts and Apps Script is mixing them up; offer per-account links.
+  setTimeout(() => {
+    if ($('email').textContent !== 'Loading…') return;
+    const links = [0, 1, 2, 3].map(n => `<a href="${esc(APP_URL.replace('/macros/s/', `/macros/u/${n}/s/`))}" target="_top">account #${n + 1}</a>`).join(' · ');
+    setStatus(`Still loading? You're probably signed in to several Google accounts. Try: ${links}. Or open this link in an Incognito window or a Chrome profile signed in to only this Gmail.`, 'warn');
+  }, 15000);
+
+  (async () => {
+    try {
+      await refreshAccount();
+      if (!account) return;
+      $('email').textContent = account.email || 'Unknown account';
+      const links = [0, 1, 2, 3].map(n => `<a href="${esc(APP_URL.replace('/macros/s/', `/macros/u/${n}/s/`))}">#${n + 1}</a>`).join('');
+      $('switch').innerHTML = 'Use another signed-in account:' + links;
+      if (account.saved && !$('lines').value) applySettings(account.saved);
+    } catch (e) {
+      setStatus('Could not load account: ' + esc(e.message || e), 'err');
+    }
+  })();
+</script>
+</body>
+</html>
